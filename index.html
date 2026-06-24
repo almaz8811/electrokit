@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ElectroKit — Расчёт электрики</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0F0A05;
+  --bg2:      #180E06;
+  --card:     #1A1208;
+  --border:   #3A2510;
+  --accent:   #E8A020;
+  --accent2:  #C07810;
+  --text:     #D4C4A0;
+  --muted:    #8A7A60;
+  --green:    #2A8A50;
+  --amber:    #C07810;
+  --red:      #8A2020;
+  --cyan:     #1A8080;
+  --blue:     #1A4080;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; min-height: 100vh; }
+h1, h2, h3 { font-family: 'Space Mono', monospace; }
+a { color: var(--accent); }
+
+/* HEADER */
+.header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: var(--bg2); border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand-name { font-family: 'Space Mono', monospace; font-size: 18px; font-weight: 700; color: var(--accent); }
+.badge { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); border: 1px solid var(--border); border-radius: 3px; padding: 2px 6px; }
+.header-btns { display: flex; gap: 8px; }
+.btn { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 7px 14px; cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; transition: border-color .15s; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn-accent { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+.btn-accent:hover { background: var(--accent2); border-color: var(--accent2); color: #000; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-danger { border-color: var(--red); color: var(--muted); }
+.btn-danger:hover { border-color: #C03030; color: #C03030; }
+
+/* SETTINGS PANEL */
+.settings-panel { background: var(--bg2); border-bottom: 2px solid var(--accent); padding: 16px 20px; display: none; }
+.settings-inner { display: grid; grid-template-columns: 140px 1fr 1fr; gap: 24px; max-width: 900px; }
+.settings-col h3 { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; font-family: 'Space Mono', monospace; }
+.cfg-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.cfg-row label { color: var(--muted); font-size: 12px; white-space: nowrap; flex: 1; min-width: 0; }
+.cfg-row input { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 8px; font-size: 12px; width: 80px; text-align: right; font-family: 'Space Mono', monospace; }
+.cfg-row input:focus { outline: none; border-color: var(--accent); }
+.cfg-cur input { width: 80px; text-align: left; font-weight: 600; color: var(--accent); }
+.settings-save { margin-top: 12px; font-size: 12px; color: var(--muted); }
+
+/* MAIN LAYOUT */
+.main { max-width: 960px; margin: 0 auto; padding: 20px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.card-title { font-size: 12px; font-family: 'Space Mono', monospace; color: var(--accent); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 14px; }
+
+/* OBJECT INFO */
+.obj-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+.field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.field input, .field select, .field textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; color: var(--text); padding: 7px 10px; font-size: 13px; font-family: 'DM Sans', sans-serif; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+.field select option { background: var(--bg2); }
+
+/* ROOMS */
+.room-block { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px; overflow: hidden; }
+.room-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg2); }
+.room-name-input { flex: 1; background: transparent; border: none; border-bottom: 1px solid var(--border); color: var(--accent); font-size: 14px; font-weight: 600; font-family: 'Space Mono', monospace; padding: 2px 4px; }
+.room-name-input:focus { outline: none; border-bottom-color: var(--accent); }
+.room-body { padding: 10px 14px; }
+.appliance-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.appliance-row select { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 5px 8px; font-size: 12px; font-family: 'DM Sans', sans-serif; }
+.appliance-row input[type=number] { width: 70px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 5px 8px; font-size: 12px; text-align: center; }
+.appliance-row input[type=text] { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 5px 8px; font-size: 12px; }
+.appliance-row select:focus, .appliance-row input:focus { outline: none; border-color: var(--accent); }
+.lbl-small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* CALC BUTTON */
+.btn-calc { display: block; width: 100%; padding: 14px; background: var(--accent); color: #000; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; font-family: 'Space Mono', monospace; cursor: pointer; letter-spacing: .5px; margin-bottom: 20px; }
+.btn-calc:hover { background: var(--accent2); }
+
+/* RESULTS */
+#results { display: none; }
+.section-title { font-family: 'Space Mono', monospace; font-size: 13px; color: var(--accent); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
+
+/* GROUPS TABLE */
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { background: var(--bg2); color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); font-family: 'Space Mono', monospace; }
+.tbl td { padding: 8px 10px; border-bottom: 1px solid #1E1208; vertical-align: middle; }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl tr:hover td { background: #1E1408; }
+.chip { display: inline-block; border-radius: 4px; padding: 2px 7px; font-size: 11px; font-family: 'Space Mono', monospace; font-weight: 700; }
+.chip-green { background: #0D2A18; color: #2EBD70; border: 1px solid #1A4A28; }
+.chip-amber { background: #2A1A05; color: #E8A020; border: 1px solid #4A2E0A; }
+.chip-red   { background: #2A0808; color: #D04040; border: 1px solid #4A1010; }
+.chip-blue  { background: #0A1830; color: #4090D0; border: 1px solid #1A3060; }
+.len-input { width: 70px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 6px; font-size: 12px; text-align: center; font-family: 'Space Mono', monospace; }
+.len-input:focus { outline: none; border-color: var(--accent); }
+.tbl-footer td { border-top: 2px solid var(--border); background: var(--bg2); color: var(--muted); font-size: 12px; padding: 8px 10px; }
+
+/* CABLE SUMMARY */
+.cable-sum { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.cable-chip { background: var(--bg2); border: 1px solid var(--border); border-radius: 5px; padding: 6px 12px; font-family: 'Space Mono', monospace; font-size: 12px; color: var(--text); }
+.cable-chip span { color: var(--accent); font-weight: 700; }
+.cable-hint { font-size: 12px; color: var(--muted); font-style: italic; margin-top: 8px; }
+
+/* ЩИТОК */
+.panel-title { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.din-rail { display: flex; flex-wrap: wrap; gap: 4px; padding: 12px; background: #0A0705; border-radius: 6px; border: 1px solid var(--border); }
+.din-mod { border-radius: 4px; padding: 5px 6px; font-family: 'Space Mono', monospace; font-size: 9px; line-height: 1.3; text-align: center; min-width: 44px; cursor: default; }
+.din-mod .mod-type { font-size: 7px; opacity: .7; text-transform: uppercase; }
+.din-mod .mod-val { font-size: 11px; font-weight: 700; }
+.din-main  { background: #2A1800; color: #E8A020; border: 1px solid #6A4010; }
+.din-uzo   { background: #002A2A; color: #20C0C0; border: 1px solid #10606060; }
+.din-uzow  { background: #001028; color: #4090D0; border: 1px solid #104080; }
+.din-dif   { background: #081828; color: #60A0E0; border: 1px solid #1A4870; }
+.din-brk-g { background: #081A10; color: #30C068; border: 1px solid #1A4A28; }
+.din-brk-a { background: #201400; color: #D08020; border: 1px solid #504010; }
+.din-brk-r { background: #1A0808; color: #D04040; border: 1px solid #4A1010; }
+.din-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.din-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.din-legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+/* СМЕТА */
+.smeta-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.smeta-section h3 { font-size: 12px; font-family: 'Space Mono', monospace; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 10px; }
+.smeta-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.smeta-tbl th { color: var(--muted); font-size: 10px; text-transform: uppercase; text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); font-family: 'Space Mono', monospace; }
+.smeta-tbl th:last-child, .smeta-tbl td:last-child { text-align: right; font-family: 'Space Mono', monospace; }
+.smeta-tbl td { padding: 5px 8px; border-bottom: 1px solid #1A1005; }
+.smeta-tbl tr:last-child td { border-bottom: none; }
+.smeta-tbl .sub-total td { border-top: 1px solid var(--border); color: var(--accent); font-weight: 600; padding-top: 8px; }
+.smeta-grand { background: var(--bg2); border: 1px solid var(--accent); border-radius: 6px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+.smeta-grand .label { font-size: 13px; color: var(--muted); }
+.smeta-grand .value { font-family: 'Space Mono', monospace; font-size: 20px; font-weight: 700; color: var(--accent); }
+.smeta-hint { font-size: 11px; color: var(--muted); font-style: italic; margin-top: 6px; }
+
+/* SUMMARY TOTAL ROW */
+.sum-row { display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--border); font-size: 13px; margin-top: 8px; }
+.sum-row span:last-child { font-family: 'Space Mono', monospace; color: var(--accent); font-weight: 700; }
+
+/* WARNINGS */
+.warn-block { border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; line-height: 1.5; }
+.warn-block ul { margin: 6px 0 0 16px; }
+.warn-block li { margin-bottom: 3px; }
+.warn-error   { background: #1A0505; border: 1px solid #6A1010; color: #E06060; }
+.warn-error strong { color: #FF5050; font-family: 'Space Mono', monospace; }
+.warn-caution { background: #1A1000; border: 1px solid #604010; color: #C08040; }
+.warn-caution strong { color: #E8A020; font-family: 'Space Mono', monospace; }
+
+.warn-info    { background: #051828; border: 1px solid #1A4060; color: #60A0C0; }
+.warn-info strong { color: #40C0E0; font-family: 'Space Mono', monospace; }
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; color: #000; font-size: 11pt; }
+  .card { background: #fff; border: 1px solid #ccc; break-inside: avoid; }
+  .tbl th { background: #f0f0f0; color: #555; }
+  .tbl td { border-bottom: 1px solid #e0e0e0; }
+  .din-rail { background: #f8f8f8; }
+  .din-mod { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .smeta-wrap { grid-template-columns: 1fr; }
+  .smeta-grand { border: 2px solid #000; }
+  #results { display: block !important; }
+  .print-header { display: block !important; }
+}
+.print-header { display: none; margin-bottom: 16px; }
+.print-header h2 { font-size: 16pt; }
+.print-header p { color: #666; font-size: 10pt; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header no-print">
+  <div class="brand">
+    <span class="brand-name">ElectroKit</span>
+    <span class="badge">ПУЭ · 220В</span>
+  </div>
+  <div class="header-btns">
+    <button class="btn" onclick="importProject()">↑ Импорт</button>
+    <button class="btn" onclick="exportProject()">↓ Экспорт</button>
+    <button class="btn" onclick="toggleSettings()">⚙ Настройки</button>
+    <button class="btn btn-accent" id="btn-pdf" style="display:none" onclick="doPrint()">⎙ PDF / Печать</button>
+  </div>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div class="settings-panel no-print" id="settings-panel">
+  <div class="settings-inner">
+    <div class="settings-col">
+      <h3>Валюта</h3>
+      <div class="cfg-row cfg-cur">
+        <label>Символ / код</label>
+        <input id="cfg-currency" value="AZN" oninput="saveSettings()" maxlength="5">
+      </div>
+      <h3 style="margin-top:16px">Объект</h3>
+      <p style="font-size:11px;color:var(--muted)">Настройки по типу объекта применяются автоматически при расчёте (Kd).</p>
+    </div>
+    <div class="settings-col">
+      <h3>Материалы</h3>
+      <div class="cfg-row"><label>ВВГнг 3×1.5 / м</label><input id="cfg-cable15" type="number" step="0.01" value="1.20" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>ВВГнг 3×2.5 / м</label><input id="cfg-cable25" type="number" step="0.01" value="1.80" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>ВВГнг 3×4.0 / м</label><input id="cfg-cable40" type="number" step="0.01" value="2.50" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>ВВГнг 3×6.0 / м</label><input id="cfg-cable60" type="number" step="0.01" value="3.80" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>ВВГнг 3×10 / м</label><input id="cfg-cable10" type="number" step="0.01" value="6.00" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Автомат 16А / шт</label><input id="cfg-brk16" type="number" step="0.01" value="5.50" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Автомат 25А / шт</label><input id="cfg-brk25" type="number" step="0.01" value="7.00" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Автомат 32А / шт</label><input id="cfg-brk32" type="number" step="0.01" value="8.00" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Автомат 40А+ / шт</label><input id="cfg-brk40" type="number" step="0.01" value="10.00" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>УЗО 2P 30мА / шт</label><input id="cfg-uzo" type="number" step="0.01" value="25.00" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Дифавтомат / шт</label><input id="cfg-dif" type="number" step="0.01" value="30.00" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Щиток / шт</label><input id="cfg-panel" type="number" step="0.01" value="20.00" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Розетка / шт</label><input id="cfg-socket" type="number" step="0.01" value="3.00" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Выключатель / шт</label><input id="cfg-sw" type="number" step="0.01" value="2.50" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Подрозетник / шт</label><input id="cfg-jbox" type="number" step="0.01" value="0.80" oninput="saveSettings()"></div>
+    </div>
+    <div class="settings-col">
+      <h3>Работы</h3>
+      <div class="cfg-row"><label>Прокладка кабеля / м</label><input id="cfg-laborCable" type="number" step="0.01" value="1.50" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Штробление / м</label><input id="cfg-laborChase" type="number" step="0.01" value="3.00" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Установка розетки / шт</label><input id="cfg-laborSocket" type="number" step="0.01" value="5.00" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Установка выкл. / шт</label><input id="cfg-laborSw" type="number" step="0.01" value="4.00" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Сборка щитка (всего)</label><input id="cfg-laborPanel" type="number" step="0.01" value="60.00" oninput="saveSettings()"></div>
+      <div class="cfg-row"><label>Подкл. группы / шт</label><input id="cfg-laborGroup" type="number" step="0.01" value="8.00" oninput="saveSettings()"></div>
+      <p class="settings-save">Все настройки сохраняются автоматически</p>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- PRINT HEADER -->
+  <div class="print-header">
+    <h2 id="ph-name"></h2>
+    <p id="ph-meta"></p>
+  </div>
+
+  <!-- OBJECT INFO -->
+  <div class="card no-print" id="obj-card">
+    <div class="card-title">Объект</div>
+    <div class="obj-grid">
+      <div class="field">
+        <label>Название</label>
+        <input id="obj-name" placeholder="Квартира на ул. Нефтяников" oninput="saveProject()">
+      </div>
+      <div class="field">
+        <label>Тип объекта</label>
+        <select id="obj-type" onchange="saveProject()">
+          <option value="apartment">Квартира (Kd 0.7)</option>
+          <option value="house">Частный дом (Kd 0.8)</option>
+          <option value="office">Офис (Kd 0.6)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Вводной автомат</label>
+        <select id="obj-breaker" onchange="saveProject()">
+          <option value="16">16 А</option>
+          <option value="25">25 А</option>
+          <option value="32" selected>32 А</option>
+          <option value="40">40 А</option>
+          <option value="50">50 А</option>
+          <option value="63">63 А</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Примечание</label>
+        <input id="obj-note" placeholder="Новостройка, медь" oninput="saveProject()">
+      </div>
+    </div>
+  </div>
+
+  <!-- ROOMS -->
+  <div class="card no-print" id="rooms-card">
+    <div class="card-title">Помещения и нагрузки</div>
+    <div id="rooms-list"></div>
+    <button class="btn" style="margin-top:8px" onclick="addRoom()">+ Добавить комнату</button>
+  </div>
+
+  <!-- CALCULATE -->
+  <button class="btn-calc no-print" onclick="calculate()">▶ Рассчитать</button>
+
+  <!-- RESULTS -->
+  <div id="results">
+
+    <!-- GROUPS -->
+    <div class="card">
+      <div class="section-title">Группы нагрузки</div>
+      <table class="tbl" id="groups-tbl">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Группа</th>
+            <th>Нагрузка</th>
+            <th>Кабель</th>
+            <th>Автомат</th>
+            <th>Тип защиты</th>
+            <th class="no-print">Длина, м</th>
+          </tr>
+        </thead>
+        <tbody id="groups-body"></tbody>
+        <tfoot id="groups-foot"></tfoot>
+      </table>
+
+      <div style="margin-top:14px">
+        <div class="section-title" style="margin-bottom:8px">Итого по кабелю</div>
+        <div class="cable-sum" id="cable-sum"></div>
+        <div class="cable-hint" id="cable-hint"></div>
+      </div>
+    </div>
+
+    <!-- WARNINGS -->
+    <div id="warnings"></div>
+
+    <!-- ЩИТОК -->
+    <div class="card">
+      <div class="section-title">Схема щитка</div>
+      <div class="din-rail" id="din-rail"></div>
+      <div class="din-legend">
+        <div class="din-legend-item"><div class="din-legend-dot" style="background:#6A4010"></div>Вводной автомат</div>
+        <div class="din-legend-item"><div class="din-legend-dot" style="background:#106060"></div>УЗО вводное</div>
+        <div class="din-legend-item"><div class="din-legend-dot" style="background:#1A3060"></div>УЗО мокрая зона</div>
+        <div class="din-legend-item"><div class="din-legend-dot" style="background:#30C068;width:8px;height:8px;border-radius:50%"></div>Авт. ≤16А</div>
+        <div class="din-legend-item"><div class="din-legend-dot" style="background:#D08020;width:8px;height:8px;border-radius:50%"></div>Авт. ≤32А</div>
+        <div class="din-legend-item"><div class="din-legend-dot" style="background:#D04040;width:8px;height:8px;border-radius:50%"></div>Авт. >32А</div>
+        <div class="din-legend-item"><div class="din-legend-dot" style="background:#4090D0"></div>Дифавтомат</div>
+      </div>
+    </div>
+
+    <!-- СМЕТА -->
+    <div class="card">
+      <div class="section-title">Смета</div>
+      <div class="smeta-wrap">
+        <div class="smeta-section">
+          <h3>Материалы</h3>
+          <table class="smeta-tbl" id="smeta-mat">
+            <thead><tr><th>Наименование</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="smeta-section">
+          <h3>Работы</h3>
+          <table class="smeta-tbl" id="smeta-labor">
+            <thead><tr><th>Вид работ</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="smeta-hint" id="smeta-hint"></div>
+      <div class="smeta-grand">
+        <span class="label">ИТОГО</span>
+        <span class="value" id="smeta-total">—</span>
+      </div>
+    </div>
+
+  </div><!-- /results -->
+</div><!-- /main -->
+
+<script>
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+
+const SPECS = {
+  socket:      { label: 'Розетки',               wPerUnit: 200,  grp: 'socket'    },
+  fridge:      { label: 'Холодильник',            wPerUnit: 150,  grp: 'socket'    },
+  tv:          { label: 'Телевизор',              wPerUnit: 150,  grp: 'socket'    },
+  microwave:   { label: 'Микроволновая печь',    wPerUnit: 1000, grp: 'socket'    },
+  kettle:      { label: 'Чайник / кофемашина',   wPerUnit: 2000, grp: 'socket'    },
+  lighting:    { label: 'Освещение (точки)',      wPerUnit: 60,   grp: 'lighting'  },
+  washing:     { label: 'Стиральная машина',      wPerUnit: 2000, grp: 'dedicated' },
+  dishwasher:  { label: 'Посудомоечная машина',  wPerUnit: 2000, grp: 'dedicated' },
+  oven:        { label: 'Духовой шкаф',           wPerUnit: 2500, grp: 'dedicated' },
+  waterHeater: { label: 'Водонагреватель',        wPerUnit: 2000, grp: 'dedicated' },
+  ac:          { label: 'Кондиционер',            wPerUnit: 2500, grp: 'ac'        },
+  custom:      { label: 'Произвольный прибор',   wPerUnit: 0,    grp: 'custom'    }
+};
+
+const KD = { apartment: 0.7, house: 0.8, office: 0.6 };
+
+const WET_KW = ['ван', 'санузел', 'туалет', 'кухн', 'баня', 'душ', 'bathroom', 'kitchen', 'toilet', 'wc'];
+
+const UZO_STD = [16, 25, 40, 63, 80, 100];
+
+const DEFAULT_CFG = {
+  currency: 'AZN',
+  cable15: 1.20, cable25: 1.80, cable40: 2.50, cable60: 3.80, cable10: 6.00,
+  brk16: 5.50, brk25: 7.00, brk32: 8.00, brk40: 10.00,
+  uzo: 25.00, dif: 30.00, panel: 20.00,
+  socket: 3.00, sw: 2.50, jbox: 0.80,
+  laborCable: 1.50, laborChase: 3.00, laborSocket: 5.00,
+  laborSw: 4.00, laborPanel: 60.00, laborGroup: 8.00
+};
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+
+let rooms = [];      // [{id, name, appliances:[{id,type,count,customName,customW}]}]
+let groups = [];     // [{num, label, room, watts, section, breaker, wet}]
+let lineLens = {};   // groupNum → meters
+
+let _roomId = 0, _appId = 0;
+function rid() { return ++_roomId; }
+function aid() { return ++_appId; }
+
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function isWetRoom(name) {
+  const n = (name || '').toLowerCase();
+  return WET_KW.some(k => n.includes(k));
+}
+
+// lineType: 'lighting' | 'socket' | 'dedicated' | 'ac' | 'custom'
+function cableForLoad(watts, lineType) {
+  // 1.25 safety margin for motor/resistive dedicated loads and AC
+  const margin = (lineType === 'dedicated' || lineType === 'ac') ? 1.25 : 1.0;
+  const a = (watts * margin) / 220;
+
+  // Minimum section by circuit type (PUE / best practice)
+  // socket / dedicated / ac → never below 2.5 mm²
+  const minSec = (lineType === 'socket' || lineType === 'dedicated' || lineType === 'ac') ? 2.5 : 1.5;
+
+  let section, breaker;
+  if (a <= 16)      { section = 1.5; breaker = 16; }
+  else if (a <= 25) { section = 2.5; breaker = 25; }
+  else if (a <= 32) { section = 4.0; breaker = 32; }
+  else if (a <= 40) { section = 6.0; breaker = 40; }
+  else              { section = 10;  breaker = 63; }
+
+  if (section < minSec) section = minSec;
+
+  const secStr = { 1.5: '1.5', 2.5: '2.5', 4.0: '4.0', 6.0: '6.0', 10: '10' }[section] || '2.5';
+  return { section: secStr, breaker };
+}
+
+function voltDrop(watts, lengthM, sectionStr) {
+  // ΔU% = (2 × L × I × ρ) / (S × U) × 100  [copper ρ = 0.0175 Ω·mm²/m]
+  const I = watts / 220;
+  const dU = (2 * lengthM * I * 0.0175) / (parseFloat(sectionStr) * 220) * 100;
+  return dU;
+}
+
+function upsizeSection(sec) {
+  const sizes = ['1.5', '2.5', '4.0', '6.0', '10'];
+  const i = sizes.indexOf(sec);
+  return i >= 0 && i < sizes.length - 1 ? sizes[i + 1] : sec;
+}
+
+function breakerChip(amp) {
+  if (amp <= 16) return `<span class="chip chip-green">${amp}А</span>`;
+  if (amp <= 32) return `<span class="chip chip-amber">${amp}А</span>`;
+  return `<span class="chip chip-red">${amp}А</span>`;
+}
+
+function uzoRating(mainA) {
+  return UZO_STD.find(r => r >= mainA) || 100;
+}
+
+function fmt(n) { return n.toFixed(2); }
+
+function fmtCur(n, cur) { return `${fmt(n)} ${cur}`; }
+
+// ─── SETTINGS ────────────────────────────────────────────────────────────────
+
+function loadSettings() {
+  try { return { ...DEFAULT_CFG, ...JSON.parse(localStorage.getItem('ek_cfg') || '{}') }; }
+  catch { return { ...DEFAULT_CFG }; }
+}
+
+function initSettings() {
+  const cfg = loadSettings();
+  for (const key of Object.keys(DEFAULT_CFG)) {
+    const el = document.getElementById('cfg-' + key);
+    if (el) el.value = cfg[key] ?? DEFAULT_CFG[key];
+  }
+}
+
+function saveSettings() {
+  const cfg = {};
+  for (const key of Object.keys(DEFAULT_CFG)) {
+    const el = document.getElementById('cfg-' + key);
+    if (!el) { cfg[key] = DEFAULT_CFG[key]; continue; }
+    cfg[key] = el.type === 'number' ? (parseFloat(el.value) || 0) : el.value;
+  }
+  localStorage.setItem('ek_cfg', JSON.stringify(cfg));
+  if (groups.length > 0) renderCost();
+}
+
+function readSettings() {
+  // Read directly from inputs (faster than localStorage round-trip during render)
+  const cfg = {};
+  for (const key of Object.keys(DEFAULT_CFG)) {
+    const el = document.getElementById('cfg-' + key);
+    if (!el) { cfg[key] = DEFAULT_CFG[key]; continue; }
+    cfg[key] = el.type === 'number' ? (parseFloat(el.value) || 0) : el.value;
+  }
+  return cfg;
+}
+
+function toggleSettings() {
+  const p = document.getElementById('settings-panel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+// ─── PROJECT PERSISTENCE ──────────────────────────────────────────────────────
+
+function saveProject() {
+  const d = {
+    name:    document.getElementById('obj-name').value,
+    type:    document.getElementById('obj-type').value,
+    breaker: document.getElementById('obj-breaker').value,
+    note:    document.getElementById('obj-note').value,
+    rooms
+  };
+  localStorage.setItem('ek_proj', JSON.stringify(d));
+}
+
+function loadProject() {
+  try {
+    const d = JSON.parse(localStorage.getItem('ek_proj') || 'null');
+    if (!d) return;
+    document.getElementById('obj-name').value    = d.name    || '';
+    document.getElementById('obj-type').value    = d.type    || 'apartment';
+    document.getElementById('obj-breaker').value = d.breaker || '32';
+    document.getElementById('obj-note').value    = d.note    || '';
+    rooms = (d.rooms || []).map(r => ({
+      ...r,
+      id: r.id || rid(),
+      appliances: (r.appliances || []).map(a => ({ ...a, id: a.id || aid() }))
+    }));
+    renderRooms();
+  } catch(e) { console.warn('loadProject:', e); }
+}
+
+// ─── ROOMS UI ────────────────────────────────────────────────────────────────
+
+function addRoom() {
+  rooms.push({ id: rid(), name: 'Комната', appliances: [] });
+  renderRooms();
+  saveProject();
+}
+
+function deleteRoom(id) {
+  rooms = rooms.filter(r => r.id !== id);
+  renderRooms();
+  saveProject();
+}
+
+function addAppliance(roomId) {
+  const r = rooms.find(x => x.id === roomId);
+  if (r) { r.appliances.push({ id: aid(), type: 'socket', count: 1, customName: '', customW: 1000 }); }
+  renderRooms();
+  saveProject();
+}
+
+function deleteAppliance(roomId, appId) {
+  const r = rooms.find(x => x.id === roomId);
+  if (r) r.appliances = r.appliances.filter(a => a.id !== appId);
+  renderRooms();
+  saveProject();
+}
+
+function onRoomName(id, val) {
+  const r = rooms.find(x => x.id === id);
+  if (r) r.name = val;
+  saveProject();
+}
+
+function onAppType(roomId, appId, val) {
+  const r = rooms.find(x => x.id === roomId);
+  if (!r) return;
+  const a = r.appliances.find(x => x.id === appId);
+  if (a) { a.type = val; }
+  renderRooms();
+  saveProject();
+}
+
+function onAppCount(roomId, appId, val) {
+  const r = rooms.find(x => x.id === roomId);
+  if (!r) return;
+  const a = r.appliances.find(x => x.id === appId);
+  if (a) a.count = Math.max(1, parseInt(val) || 1);
+  saveProject();
+}
+
+function onAppCustomName(roomId, appId, val) {
+  const r = rooms.find(x => x.id === roomId);
+  if (!r) return;
+  const a = r.appliances.find(x => x.id === appId);
+  if (a) a.customName = val;
+  saveProject();
+}
+
+function onAppCustomW(roomId, appId, val) {
+  const r = rooms.find(x => x.id === roomId);
+  if (!r) return;
+  const a = r.appliances.find(x => x.id === appId);
+  if (a) a.customW = Math.max(1, parseInt(val) || 1);
+  saveProject();
+}
+
+function renderRooms() {
+  const list = document.getElementById('rooms-list');
+  if (!rooms.length) {
+    list.innerHTML = '<p style="color:var(--muted);font-size:12px;margin:8px 0">Нет комнат. Добавьте первую.</p>';
+    return;
+  }
+
+  const typeOptions = Object.entries(SPECS).map(([k, v]) =>
+    `<option value="${k}">${esc(v.label)}</option>`
+  ).join('');
+
+  list.innerHTML = rooms.map(r => {
+    const appRows = r.appliances.map(a => {
+      const isCustom = a.type === 'custom';
+      const customFields = isCustom
+        ? `<input type="text" placeholder="Название" value="${esc(a.customName)}" style="width:120px" oninput="onAppCustomName(${r.id},${a.id},this.value)">
+           <input type="number" min="1" placeholder="Вт" value="${esc(a.customW)}" oninput="onAppCustomW(${r.id},${a.id},this.value)">`
+        : `<span class="lbl-small">${SPECS[a.type] ? Math.round(SPECS[a.type].wPerUnit * a.count) + ' Вт' : ''}</span>`;
+
+      const selectedOptions = Object.entries(SPECS).map(([k, v]) =>
+        `<option value="${k}" ${a.type === k ? 'selected' : ''}>${esc(v.label)}</option>`
+      ).join('');
+
+      return `<div class="appliance-row">
+        <select onchange="onAppType(${r.id},${a.id},this.value)">${selectedOptions}</select>
+        <span class="lbl-small">×</span>
+        <input type="number" min="1" value="${a.count}" oninput="onAppCount(${r.id},${a.id},this.value)">
+        ${customFields}
+        <button class="btn btn-sm btn-danger" onclick="deleteAppliance(${r.id},${a.id})">✕</button>
+      </div>`;
+    }).join('');
+
+    return `<div class="room-block">
+      <div class="room-header">
+        <input class="room-name-input" value="${esc(r.name)}" oninput="onRoomName(${r.id},this.value)">
+        <button class="btn btn-sm" onclick="addAppliance(${r.id})">+ прибор</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteRoom(${r.id})">✕</button>
+      </div>
+      <div class="room-body">
+        ${appRows || '<p style="color:var(--muted);font-size:12px">Нет приборов</p>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── BUILD GROUPS ─────────────────────────────────────────────────────────────
+
+function buildGroups(objType) {
+  const result = [];
+  let num = 0;
+
+  for (const room of rooms) {
+    const wet = isWetRoom(room.name);
+
+    // Lighting group
+    const lightApps = room.appliances.filter(a => a.type === 'lighting');
+    if (lightApps.length) {
+      const w = lightApps.reduce((s, a) => s + a.count * SPECS.lighting.wPerUnit, 0);
+      const { section, breaker } = cableForLoad(w, 'lighting');
+      result.push({ num: ++num, label: `${room.name} — Освещение`, room: room.name, watts: w, section, breaker, wet: false, lineType: 'lighting' });
+    }
+
+    // Socket group (all socket-grp items combined)
+    const socketApps = room.appliances.filter(a => SPECS[a.type] && SPECS[a.type].grp === 'socket');
+    if (socketApps.length) {
+      const w = socketApps.reduce((s, a) => s + a.count * SPECS[a.type].wPerUnit, 0);
+      const socketCount = socketApps.filter(a => a.type === 'socket').reduce((s, a) => s + a.count, 0);
+      const { section, breaker } = cableForLoad(w, 'socket');
+      result.push({ num: ++num, label: `${room.name} — Розетки и приборы`, room: room.name, watts: w, section, breaker, wet, lineType: 'socket', socketCount });
+    }
+
+    // Dedicated: one group per appliance type
+    const dedTypes = ['washing', 'dishwasher', 'oven', 'waterHeater'];
+    for (const t of dedTypes) {
+      const apps = room.appliances.filter(a => a.type === t);
+      if (!apps.length) continue;
+      const w = apps.reduce((s, a) => s + a.count * SPECS[t].wPerUnit, 0);
+      const { section, breaker } = cableForLoad(w, 'dedicated');
+      result.push({ num: ++num, label: `${room.name} — ${SPECS[t].label}`, room: room.name, watts: w, section, breaker, wet, lineType: 'dedicated' });
+    }
+
+    // AC: one group per unit (always dry)
+    const acApps = room.appliances.filter(a => a.type === 'ac');
+    for (const a of acApps) {
+      for (let i = 0; i < a.count; i++) {
+        const w = SPECS.ac.wPerUnit;
+        const { section, breaker } = cableForLoad(w, 'ac');
+        const idx = a.count > 1 ? ` #${i + 1}` : '';
+        result.push({ num: ++num, label: `${room.name} — Кондиционер${idx}`, room: room.name, watts: w, section, breaker, wet: false, lineType: 'ac' });
+      }
+    }
+
+    // Custom: one group per entry
+    const customApps = room.appliances.filter(a => a.type === 'custom');
+    for (const a of customApps) {
+      const w = (a.customW || 0) * a.count;
+      const { section, breaker } = cableForLoad(w, 'custom');
+      result.push({ num: ++num, label: `${room.name} — ${a.customName || 'Произвольный'}`, room: room.name, watts: w, section, breaker, wet: false });
+    }
+  }
+
+  return result;
+}
+
+// ─── CALCULATE ───────────────────────────────────────────────────────────────
+
+function calculate() {
+  if (!rooms.length) { alert('Добавьте хотя бы одну комнату'); return; }
+
+  const objType  = document.getElementById('obj-type').value;
+  const mainBreaker = parseInt(document.getElementById('obj-breaker').value);
+  const kd = KD[objType] || 0.7;
+
+  groups = buildGroups(objType);
+  lineLens = {};
+
+  const totalRaw = groups.reduce((s, g) => s + g.watts, 0);
+  const totalKd  = totalRaw * kd;
+  const totalA   = totalKd / 220;
+
+  renderGroups(totalRaw, totalKd, totalA);
+  renderPanel();
+  checkWarnings(mainBreaker, totalKd, totalA);
+  renderCost();
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('btn-pdf').style.display = 'inline-block';
+
+  // Print header
+  const name = document.getElementById('obj-name').value;
+  const note = document.getElementById('obj-note').value;
+  const objLabel = document.getElementById('obj-type').selectedOptions[0].text;
+  document.getElementById('ph-name').textContent = name || 'ElectroKit — Расчёт';
+  document.getElementById('ph-meta').textContent = `${objLabel}${note ? ' · ' + note : ''} · ${new Date().toLocaleDateString('ru-RU')}`;
+
+  saveProject();
+}
+
+// ─── WARNINGS ────────────────────────────────────────────────────────────────
+
+function checkWarnings(mainBreaker, totalKd, totalA) {
+  const box = document.getElementById('warnings');
+  const blocks = [];
+
+  // ── ERRORS ──────────────────────────────────────────────────────────────────
+
+  // 1. Total load vs main breaker
+  if (totalA > mainBreaker) {
+    blocks.push(`<div class="warn-block warn-error">
+      <strong>⛔ Перегрузка вводного автомата</strong><br>
+      Расчётный ток <strong>${totalA.toFixed(1)} А</strong> превышает номинал вводного
+      автомата <strong>${mainBreaker} А</strong>. Увеличьте вводной автомат или сократите нагрузку.
+    </div>`);
+  }
+
+  // 2. Selectivity: group breaker must be strictly less than main breaker
+  const badGroups = groups.filter(g => !g.wet && g.breaker >= mainBreaker);
+  if (badGroups.length) {
+    const list = badGroups.map(g =>
+      `<li>Гр.${g.num} «${esc(g.label)}» — автомат ${g.breaker} А</li>`
+    ).join('');
+    blocks.push(`<div class="warn-block warn-error">
+      <strong>⛔ Нарушена селективность</strong><br>
+      Групповой автомат должен быть строго меньше вводного (${mainBreaker} А).
+      При коротком замыкании оба автомата сработают одновременно — обесточится весь щит.
+      <ul>${list}</ul>
+      Увеличьте вводной автомат или уменьшите групповые.
+    </div>`);
+  }
+
+  // ── CAUTIONS ────────────────────────────────────────────────────────────────
+
+  // 3. Low selectivity margin (< 1 standard step)
+  const closeGroups = groups.filter(g => !g.wet && g.breaker < mainBreaker && (mainBreaker - g.breaker) < 8);
+  if (closeGroups.length && !badGroups.length) {
+    const list = closeGroups.map(g =>
+      `<li>Гр.${g.num} «${esc(g.label)}» — автомат ${g.breaker} А (вводной ${mainBreaker} А)</li>`
+    ).join('');
+    blocks.push(`<div class="warn-block warn-caution">
+      <strong>⚠ Низкая селективность</strong><br>
+      Разница между групповым и вводным автоматом менее одной ступени.
+      Рекомендуется разница ≥ 2 ступени для надёжного срабатывания.
+      <ul>${list}</ul>
+    </div>`);
+  }
+
+  // ── RECOMMENDATIONS ──────────────────────────────────────────────────────────
+
+  const tips = [];
+
+  // 4. Main breaker capacity reserve < 20%
+  const loadPct = (totalA / mainBreaker) * 100;
+  if (totalA <= mainBreaker && loadPct > 80) {
+    tips.push(`Вводной автомат загружен на <strong>${Math.round(loadPct)}%</strong>.
+      Запас менее 20% — при добавлении новых нагрузок потребуется его замена.
+      Рассмотрите следующий номинал.`);
+  }
+
+  // 5. Socket group > 3500 W — suggest splitting
+  const heavySockets = groups.filter(g => g.lineType === 'socket' && g.watts > 3500);
+  for (const g of heavySockets) {
+    tips.push(`Гр.${g.num} «${esc(g.label)}» — нагрузка ${g.watts} Вт.
+      При такой мощности рекомендуется разделить на две отдельные розеточные группы
+      по 2.5 мм² + С16 каждая.`);
+  }
+
+  // 6. Many sockets on one circuit (> 6 outlets)
+  const crowdedSockets = groups.filter(g => g.lineType === 'socket' && (g.socketCount || 0) > 6);
+  for (const g of crowdedSockets) {
+    if (!heavySockets.includes(g)) {
+      tips.push(`Гр.${g.num} «${esc(g.label)}» — ${g.socketCount} розеток на одной линии.
+        Рекомендуется не более 6 розеток на группу для удобства обслуживания.`);
+    }
+  }
+
+  // 7. Total DIN modules count — suggest panel size
+  const wetRooms = new Set(groups.filter(g => g.wet).map(g => g.room));
+  const totalModules = 2 + wetRooms.size + groups.length; // main breaker + main UZO + wet UZOs + groups
+  if (totalModules > 24) {
+    tips.push(`Щиток потребует около <strong>${totalModules} модулей</strong>.
+      Используйте щиток на 36 мест или разделите на вводной и групповой щит.`);
+  } else if (totalModules > 16) {
+    tips.push(`Щиток потребует около <strong>${totalModules} модулей</strong>.
+      Используйте щиток на 24 места.`);
+  }
+
+  // 8. No wet zones — suggest adding general UZO for all groups anyway
+  const hasWetZone = groups.some(g => g.wet);
+  if (!hasWetZone && groups.length > 0) {
+    tips.push(`Мокрые зоны не обнаружены. Для дополнительной защиты рекомендуется
+      установить общее УЗО 30 мА после вводного автомата на все группы.`);
+  }
+
+  if (tips.length) {
+    const list = tips.map(t => `<li style="margin-bottom:6px">${t}</li>`).join('');
+    blocks.push(`<div class="warn-block warn-info">
+      <strong>💡 Рекомендации</strong>
+      <ul style="margin-top:8px">${list}</ul>
+    </div>`);
+  }
+
+  box.innerHTML = blocks.join('');
+}
+
+// ─── RENDER GROUPS ───────────────────────────────────────────────────────────
+
+function renderGroups(totalRaw, totalKd, totalA) {
+  const body = document.getElementById('groups-body');
+  const foot = document.getElementById('groups-foot');
+
+  body.innerHTML = groups.map(g => {
+    const bChip = breakerChip(g.breaker);
+    const protChip = g.wet
+      ? `<span class="chip chip-blue">Дифавтомат 30мА</span>`
+      : `<span class="chip" style="background:#1A1208;color:var(--muted);border:1px solid var(--border)">Автомат</span>`;
+    return `<tr>
+      <td style="color:var(--muted);font-family:'Space Mono',monospace">${g.num}</td>
+      <td>${esc(g.label)}</td>
+      <td style="font-family:'Space Mono',monospace">${g.watts} Вт</td>
+      <td>ВВГнг 3×${g.section} мм²</td>
+      <td>${bChip}</td>
+      <td>${protChip}</td>
+      <td class="no-print">
+        <input class="len-input" type="number" min="0" placeholder="—" data-group="${g.num}" oninput="updateLen(this)">
+        <div id="vd-${g.num}" style="font-size:10px;margin-top:2px;font-family:'Space Mono',monospace"></div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  foot.innerHTML = `<tr class="tbl-footer">
+    <td colspan="2">ИТОГО (без Kd)</td>
+    <td style="font-family:'Space Mono',monospace">${Math.round(totalRaw)} Вт</td>
+    <td colspan="4"></td>
+  </tr>
+  <tr class="tbl-footer">
+    <td colspan="2">РАСЧЁТНАЯ НАГРУЗКА (Kd ${KD[document.getElementById('obj-type').value]})</td>
+    <td style="font-family:'Space Mono',monospace;color:var(--accent)">${Math.round(totalKd)} Вт / ${totalA.toFixed(1)} А</td>
+    <td colspan="4"></td>
+  </tr>`;
+}
+
+function updateLen(el) {
+  const num = parseInt(el.dataset.group);
+  lineLens[num] = parseFloat(el.value) || 0;
+
+  // Voltage drop indicator
+  const g = groups.find(x => x.num === num);
+  const vdEl = document.getElementById('vd-' + num);
+  if (g && vdEl) {
+    const L = lineLens[num];
+    if (L > 0) {
+      const dU = voltDrop(g.watts, L, g.section);
+      if (dU > 5) {
+        const up = upsizeSection(g.section);
+        vdEl.innerHTML = `<span style="color:#D04040">ΔU=${dU.toFixed(1)}% ⚠ → ${up}мм²</span>`;
+      } else if (dU > 4) {
+        vdEl.innerHTML = `<span style="color:#E8A020">ΔU=${dU.toFixed(1)}%</span>`;
+      } else {
+        vdEl.innerHTML = `<span style="color:#2EBD70">ΔU=${dU.toFixed(1)}%</span>`;
+      }
+    } else {
+      vdEl.innerHTML = '';
+    }
+  }
+
+  renderCost();
+  renderCableSum();
+}
+
+// ─── RENDER CABLE SUMMARY ────────────────────────────────────────────────────
+
+function renderCableSum() {
+  const sums = {};
+  for (const g of groups) {
+    const m = lineLens[g.num] || 0;
+    if (!sums[g.section]) sums[g.section] = 0;
+    sums[g.section] += m;
+  }
+
+  const hasLens = Object.values(lineLens).some(v => v > 0);
+  const hint = document.getElementById('cable-hint');
+  const wrap = document.getElementById('cable-sum');
+
+  if (!hasLens) {
+    wrap.innerHTML = '';
+    hint.textContent = 'Укажите длины линий в таблице выше для расчёта метража кабеля';
+    return;
+  }
+  hint.textContent = '';
+
+  const SECTIONS = ['1.5', '2.5', '4.0', '6.0', '10'];
+  wrap.innerHTML = SECTIONS.filter(s => sums[s]).map(s =>
+    `<div class="cable-chip">ВВГнг 3×${s}: <span>${Math.ceil(sums[s])} м</span></div>`
+  ).join('');
+}
+
+// ─── RENDER PANEL ────────────────────────────────────────────────────────────
+
+function renderPanel() {
+  const mainA  = parseInt(document.getElementById('obj-breaker').value);
+  const uzoA   = uzoRating(mainA);
+  const rail   = document.getElementById('din-rail');
+
+  // Which rooms need a wet zone UZO?
+  const wetRooms = new Set(groups.filter(g => g.wet).map(g => g.room));
+
+  let html = '';
+
+  // Main breaker
+  html += `<div class="din-mod din-main" title="Вводной автомат">
+    <div class="mod-type">Ввод</div>
+    <div class="mod-val">${mainA}А</div>
+    <div class="mod-type">Авт.</div>
+  </div>`;
+
+  // Main UZO
+  html += `<div class="din-mod din-uzo" title="УЗО вводное ${uzoA}А/30мА">
+    <div class="mod-type">УЗО</div>
+    <div class="mod-val">${uzoA}А</div>
+    <div class="mod-type">30мА</div>
+  </div>`;
+
+  // Wet zone UZOs
+  for (const room of wetRooms) {
+    html += `<div class="din-mod din-uzow" title="УЗО мокрая зона: ${esc(room)}">
+      <div class="mod-type">УЗО</div>
+      <div class="mod-val">25А</div>
+      <div class="mod-type">30мА</div>
+    </div>`;
+  }
+
+  // Group modules
+  for (const g of groups) {
+    if (g.wet) {
+      html += `<div class="din-mod din-dif" title="Гр.${g.num}: ${esc(g.label)}">
+        <div class="mod-type">Диф</div>
+        <div class="mod-val">${g.breaker}А</div>
+        <div class="mod-type">Гр.${g.num}</div>
+      </div>`;
+    } else {
+      const cls = g.breaker <= 16 ? 'din-brk-g' : g.breaker <= 32 ? 'din-brk-a' : 'din-brk-r';
+      html += `<div class="din-mod ${cls}" title="Гр.${g.num}: ${esc(g.label)}">
+        <div class="mod-type">Авт.</div>
+        <div class="mod-val">${g.breaker}А</div>
+        <div class="mod-type">Гр.${g.num}</div>
+      </div>`;
+    }
+  }
+
+  rail.innerHTML = html;
+}
+
+// ─── RENDER COST ─────────────────────────────────────────────────────────────
+
+function renderCost() {
+  const cfg = readSettings();
+  const cur = cfg.currency || 'AZN';
+
+  // Cable totals
+  const cableM = {};
+  const hasLens = Object.values(lineLens).some(v => v > 0);
+  for (const g of groups) {
+    const m = lineLens[g.num] || 0;
+    if (!cableM[g.section]) cableM[g.section] = 0;
+    cableM[g.section] += m;
+  }
+  const totalLineM = Object.values(cableM).reduce((s, v) => s + v, 0);
+
+  // Breaker counts (dry groups)
+  const brkCount = {};
+  let difCount = 0;
+  const wetRooms = new Set();
+  for (const g of groups) {
+    if (g.wet) {
+      difCount++;
+      wetRooms.add(g.room);
+    } else {
+      brkCount[g.breaker] = (brkCount[g.breaker] || 0) + 1;
+    }
+  }
+
+  // Main breaker
+  const mainA = parseInt(document.getElementById('obj-breaker').value);
+  brkCount[mainA] = (brkCount[mainA] || 0) + 1;
+
+  const uzoWetCount = wetRooms.size;
+  const uzoTotalCount = 1 + uzoWetCount; // 1 вводное + per wet room
+
+  // Socket & switch counts from rooms
+  let socketCount = 0;
+  let lightRooms = 0;
+  for (const room of rooms) {
+    for (const a of room.appliances) {
+      if (a.type === 'socket') socketCount += a.count;
+    }
+    if (room.appliances.some(a => a.type === 'lighting')) lightRooms++;
+  }
+  const switchCount = lightRooms;
+  const jboxCount = socketCount + switchCount;
+
+  // Cable price
+  const CABLE_PRICES = { '1.5': cfg.cable15, '2.5': cfg.cable25, '4.0': cfg.cable40, '6.0': cfg.cable60, '10': cfg.cable10 };
+  function breakerPrice(amp) {
+    if (amp <= 16) return cfg.brk16;
+    if (amp <= 25) return cfg.brk25;
+    if (amp <= 32) return cfg.brk32;
+    return cfg.brk40;
+  }
+
+  // ── Materials ──
+  const matRows = [];
+  let matTotal = 0;
+
+  // Cable
+  const SECTIONS = ['1.5', '2.5', '4.0', '6.0', '10'];
+  for (const s of SECTIONS) {
+    const m = cableM[s] || 0;
+    if (!m) continue;
+    const price = CABLE_PRICES[s];
+    const sum = m * price;
+    matTotal += sum;
+    matRows.push({ name: `ВВГнг 3×${s} мм²`, qty: `${Math.ceil(m)} м`, price: fmt(price), sum: fmt(sum) });
+  }
+
+  // Breakers
+  for (const [amp, cnt] of Object.entries(brkCount).sort((a, b) => +a[0] - +b[0])) {
+    if (!cnt) continue;
+    const price = breakerPrice(+amp);
+    const sum = cnt * price;
+    matTotal += sum;
+    matRows.push({ name: `Автомат ${amp}А`, qty: `${cnt} шт`, price: fmt(price), sum: fmt(sum) });
+  }
+
+  // Дифавтоматы
+  if (difCount > 0) {
+    const sum = difCount * cfg.dif;
+    matTotal += sum;
+    matRows.push({ name: 'Дифавтомат', qty: `${difCount} шт`, price: fmt(cfg.dif), sum: fmt(sum) });
+  }
+
+  // УЗО
+  if (uzoTotalCount > 0) {
+    const sum = uzoTotalCount * cfg.uzo;
+    matTotal += sum;
+    matRows.push({ name: `УЗО 2P 30мА`, qty: `${uzoTotalCount} шт`, price: fmt(cfg.uzo), sum: fmt(sum) });
+  }
+
+  // Щиток
+  matTotal += cfg.panel;
+  matRows.push({ name: 'Щиток DIN', qty: '1 шт', price: fmt(cfg.panel), sum: fmt(cfg.panel) });
+
+  // Розетки
+  if (socketCount > 0) {
+    const sum = socketCount * cfg.socket;
+    matTotal += sum;
+    matRows.push({ name: 'Розетки', qty: `${socketCount} шт`, price: fmt(cfg.socket), sum: fmt(sum) });
+  }
+
+  // Выключатели
+  if (switchCount > 0) {
+    const sum = switchCount * cfg.sw;
+    matTotal += sum;
+    matRows.push({ name: 'Выключатели', qty: `${switchCount} шт`, price: fmt(cfg.sw), sum: fmt(sum) });
+  }
+
+  // Подрозетники
+  if (jboxCount > 0) {
+    const sum = jboxCount * cfg.jbox;
+    matTotal += sum;
+    matRows.push({ name: 'Подрозетники', qty: `${jboxCount} шт`, price: fmt(cfg.jbox), sum: fmt(sum) });
+  }
+
+  // ── Labor ──
+  const laborRows = [];
+  let laborTotal = 0;
+
+  // Прокладка кабеля
+  if (totalLineM > 0) {
+    const sum = totalLineM * cfg.laborCable;
+    laborTotal += sum;
+    laborRows.push({ name: 'Прокладка кабеля', qty: `${Math.ceil(totalLineM)} м`, price: fmt(cfg.laborCable), sum: fmt(sum) });
+
+    // Штробление
+    if (cfg.laborChase > 0) {
+      const sum2 = totalLineM * cfg.laborChase;
+      laborTotal += sum2;
+      laborRows.push({ name: 'Штробление', qty: `${Math.ceil(totalLineM)} м`, price: fmt(cfg.laborChase), sum: fmt(sum2) });
+    }
+  }
+
+  if (socketCount > 0) {
+    const sum = socketCount * cfg.laborSocket;
+    laborTotal += sum;
+    laborRows.push({ name: 'Установка розеток', qty: `${socketCount} шт`, price: fmt(cfg.laborSocket), sum: fmt(sum) });
+  }
+
+  if (switchCount > 0) {
+    const sum = switchCount * cfg.laborSw;
+    laborTotal += sum;
+    laborRows.push({ name: 'Установка выкл.', qty: `${switchCount} шт`, price: fmt(cfg.laborSw), sum: fmt(sum) });
+  }
+
+  if (cfg.laborPanel > 0) {
+    laborTotal += cfg.laborPanel;
+    laborRows.push({ name: 'Сборка щитка', qty: '1', price: fmt(cfg.laborPanel), sum: fmt(cfg.laborPanel) });
+  }
+
+  if (groups.length > 0 && cfg.laborGroup > 0) {
+    const sum = groups.length * cfg.laborGroup;
+    laborTotal += sum;
+    laborRows.push({ name: 'Подключение групп', qty: `${groups.length} шт`, price: fmt(cfg.laborGroup), sum: fmt(sum) });
+  }
+
+  // ── Render ──
+  function buildTblRows(rows, total) {
+    return rows.map(r =>
+      `<tr><td>${esc(r.name)}</td><td>${esc(r.qty)}</td><td>${esc(r.price)}</td><td>${esc(r.sum)}</td></tr>`
+    ).join('') + `<tr class="sub-total"><td colspan="3">Итого</td><td>${fmt(total)} ${cur}</td></tr>`;
+  }
+
+  document.querySelector('#smeta-mat tbody').innerHTML = buildTblRows(matRows, matTotal);
+  document.querySelector('#smeta-labor tbody').innerHTML = buildTblRows(laborRows, laborTotal);
+
+  const grand = matTotal + laborTotal;
+  document.getElementById('smeta-total').textContent = fmtCur(grand, cur);
+
+  const hint = document.getElementById('smeta-hint');
+  hint.textContent = !hasLens
+    ? '⚠ Введите длины линий в таблице групп для точного расчёта стоимости кабеля и работ'
+    : '';
+
+  renderCableSum();
+}
+
+// ─── EXPORT / IMPORT ─────────────────────────────────────────────────────────
+
+function exportProject() {
+  const d = {
+    electrokit: true,
+    version: 2,
+    name:    document.getElementById('obj-name').value,
+    type:    document.getElementById('obj-type').value,
+    breaker: document.getElementById('obj-breaker').value,
+    note:    document.getElementById('obj-note').value,
+    rooms,
+    cfg:     readSettings()
+  };
+  const blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `electrokit-${(d.name || 'project').replace(/[^\w\-]/g, '_')}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importProject() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.json,application/json';
+  inp.onchange = e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        if (!d.electrokit) { alert('Это не файл ElectroKit'); return; }
+        if (d.cfg) { localStorage.setItem('ek_cfg', JSON.stringify(d.cfg)); initSettings(); }
+        document.getElementById('obj-name').value    = d.name    || '';
+        document.getElementById('obj-type').value    = d.type    || 'apartment';
+        document.getElementById('obj-breaker').value = d.breaker || '32';
+        document.getElementById('obj-note').value    = d.note    || '';
+        rooms = (d.rooms || []).map(r => ({
+          ...r, id: r.id || rid(),
+          appliances: (r.appliances || []).map(a => ({ ...a, id: a.id || aid() }))
+        }));
+        renderRooms();
+        saveProject();
+        document.getElementById('results').style.display = 'none';
+        document.getElementById('btn-pdf').style.display = 'none';
+        groups = []; lineLens = {};
+      } catch(err) { alert('Ошибка чтения файла:\n' + err.message); }
+    };
+    reader.readAsText(f);
+  };
+  inp.click();
+}
+
+// ─── PRINT ───────────────────────────────────────────────────────────────────
+
+function doPrint() {
+  window.print();
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+  initSettings();
+  loadProject();
+  if (!rooms.length) {
+    // Add a default room to get started
+    rooms.push({ id: rid(), name: 'Гостиная', appliances: [
+      { id: aid(), type: 'lighting', count: 6, customName: '', customW: 0 },
+      { id: aid(), type: 'socket',   count: 4, customName: '', customW: 0 }
+    ]});
+    rooms.push({ id: rid(), name: 'Кухня', appliances: [
+      { id: aid(), type: 'lighting', count: 4, customName: '', customW: 0 },
+      { id: aid(), type: 'socket',   count: 3, customName: '', customW: 0 },
+      { id: aid(), type: 'kettle',   count: 1, customName: '', customW: 0 },
+      { id: aid(), type: 'oven',     count: 1, customName: '', customW: 0 }
+    ]});
+    rooms.push({ id: rid(), name: 'Ванная', appliances: [
+      { id: aid(), type: 'lighting',    count: 2, customName: '', customW: 0 },
+      { id: aid(), type: 'socket',      count: 1, customName: '', customW: 0 },
+      { id: aid(), type: 'washing',     count: 1, customName: '', customW: 0 },
+      { id: aid(), type: 'waterHeater', count: 1, customName: '', customW: 0 }
+    ]});
+    renderRooms();
+  }
+});
+</script>
+</body>
+</html>
