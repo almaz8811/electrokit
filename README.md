@@ -9,7 +9,7 @@
 
 > Один HTML-файл. Без установки. Без интернета. Без сервера.
 
-**[→ Открыть онлайн](https://darkenamber.github.io/electrokit/)** · [Скачать](https://github.com/DarkenAmber/electrokit/releases/latest)
+**[→ Открыть онлайн](https://darkenamber.github.io/electrokit/)**
 
 ---
 
