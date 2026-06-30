@@ -109,10 +109,15 @@ a { color: var(--accent); }
 
 /* ЩИТОК */
 .panel-title { font-family: 'Space Mono', monospace; font-size: 14px; color: var(--muted); margin-bottom: 8px; }
-.din-rail { display: flex; flex-wrap: wrap; gap: 4px; padding: 12px; background: #080514; border-radius: 6px; border: 1px solid var(--border); }
-.din-mod { border-radius: 4px; padding: 6px 7px; font-family: 'Space Mono', monospace; font-size: 10px; line-height: 1.3; text-align: center; min-width: 48px; cursor: default; }
-.din-mod .mod-type { font-size: 8px; opacity: .8; text-transform: uppercase; }
-.din-mod .mod-val { font-size: 13px; font-weight: 700; }
+.din-rail { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px; background: #080514; border-radius: 6px; border: 1px solid var(--border); align-items: flex-start; }
+.din-mod { border-radius: 6px; padding: 10px 10px 12px; font-family: 'Space Mono', monospace; font-size: 10px; line-height: 1.3; text-align: center; width: 96px; min-height: 96px; display: flex; flex-direction: column; justify-content: flex-start; cursor: default; }
+.din-mod.draggable { cursor: grab; transition: opacity .15s, transform .15s; }
+.din-mod.draggable:active { cursor: grabbing; }
+.din-mod.drag-over { outline: 2px solid var(--accent); transform: scale(1.05); }
+.din-mod.dragging { opacity: .4; }
+.din-mod .mod-type { font-size: 9px; opacity: .8; text-transform: uppercase; }
+.din-mod .mod-val { font-size: 17px; font-weight: 700; margin: 4px 0; }
+.din-mod .mod-room { font-size: 9.5px; opacity: .9; white-space: normal; line-height: 1.35; margin-top: 4px; word-break: break-word; border-top: 1px solid rgba(255,255,255,.1); padding-top: 5px; }
 .din-main  { background: #1E1000; color: #E8A020; border: 1px solid #604010; }
 .din-uzo   { background: #001828; color: #20C0D0; border: 1px solid #105060; }
 .din-uzow  { background: #041820; color: #20C0D0; border: 1px solid #106070; }
@@ -347,7 +352,7 @@ a { color: var(--accent); }
 
   <!-- DISCLAIMER -->
   <div style="background:#0A0618;border:1px solid #3A2060;border-radius:6px;padding:10px 14px;font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:4px">
-    ⚠ Расчёт выполнен для предварительной оценки. Токи кабелей по ПУЭ табл.1.3.4 - для одиночной прокладки в воздухе при +25°C. При групповой прокладке, в трубе или при повышенной температуре допустимый ток снижается - применяйте поправочные коэффициенты. Заземление и тип системы заземления (TN-C-S, TN-S, TT) инструментом не рассчитываются - проверку контура заземления выполняет специалист с измерительным оборудованием. Не является проектной документацией.
+    ⚠ Расчёт выполнен для предварительной оценки. Токи кабелей по ПУЭ табл.1.3.4 - для одиночной прокладки в воздухе при +25°C. При групповой прокладке, в трубе или при повышенной температуре допустимый ток снижается - применяйте поправочные коэффициенты. Противопожарное УЗО 100мА защищает от токов утечки на землю - это самостоятельное устройство, не связанное с реле напряжения или УЗИП (это принципиально разные устройства с разными функциями). Заземление и тип системы заземления (TN-C-S, TN-S, TT) инструментом не рассчитываются - проверку контура заземления выполняет специалист с измерительным оборудованием. Не является проектной документацией.
   </div>
 
   <!-- GROUPS -->
@@ -402,6 +407,7 @@ a { color: var(--accent); }
     <div class="card">
       <div class="section-title">Схема щитка</div>
       <div class="din-rail" id="din-rail"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">✥ Перетащите групповые модули для изменения порядка. Порядок сохраняется в проекте.</div>
       <div class="din-legend">
         <div class="din-legend-item"><div class="din-legend-dot" style="background:#6A4010"></div>Вводной автомат</div>
         <div class="din-legend-item"><div class="din-legend-dot" style="background:#106060"></div>УЗО 100мА противопожарное (опция)</div>
@@ -518,7 +524,8 @@ const DEFAULT_CFG = {
 let rooms = [];      // [{id, name, appliances:[{id,type,count,customName,customW}]}]
 let groups = [];     // [{num, label, room, watts, section, breaker, wet}]
 let lineLens = {};   // groupNum → meters
-let manualOverrides = {}; // groupNum → {section, breaker} — мануальный режим
+let manualOverrides = {}; // groupNum → {section, breaker}
+let panelOrder = [];      // [groupNum, ...] — порядок групповых модулей в щитке
 
 let _roomId = 0, _appId = 0;
 function rid() { return ++_roomId; }
@@ -707,6 +714,7 @@ function saveProject() {
     breaker: document.getElementById('obj-breaker').value,
     note:    document.getElementById('obj-note').value,
     rooms,
+    panelOrder,
     _saved:  new Date().toISOString()
   };
   localStorage.setItem('ek_proj', JSON.stringify(d));
@@ -732,6 +740,7 @@ function loadProject() {
     const maxAid = Math.max(0, ...rooms.flatMap(r => r.appliances.map(a => a.id)));
     if (maxRid > _roomId) _roomId = maxRid;
     if (maxAid > _appId)  _appId  = maxAid;
+    if (d.panelOrder) panelOrder = d.panelOrder;
     renderRooms();
   } catch(e) { console.warn('loadProject:', e); }
 }
@@ -1007,6 +1016,7 @@ function calculate() {
   groups = buildGroups(objType);
   lineLens = {};
   manualOverrides = {};
+  panelOrder = groups.map(g => g.num); // сброс порядка при новом расчёте
   if (editMode === 'manual') setMode('auto'); // сброс в авто при новом расчёте
   // Pre-fill line lengths from room distances
   for (const g of groups) {
@@ -1481,75 +1491,119 @@ function renderPanel() {
   const scheme = cfg.wetScheme === 'B' ? 'B' : 'A';
   const mainA = parseInt(document.getElementById('obj-breaker').value);
   const rail  = document.getElementById('din-rail');
-
-  const dryMod = (g) => {
-    const cls = g.breaker <= 16 ? 'din-brk-g' : g.breaker <= 32 ? 'din-brk-a' : 'din-brk-r';
-    return `<div class="din-mod ${cls}" title="Гр.${g.num}: ${esc(g.label)} - Авт. ${g.brkClass||'C'}${g.breaker}А">
-      <div class="mod-type">Авт.</div>
-      <div class="mod-val">${g.brkClass||'C'}${g.breaker}А</div>
-      <div class="mod-type">Гр.${g.num}</div>
-    </div>`;
-  };
-
-  let html = '';
-
   const is3ph = document.getElementById('obj-phase').value === '3';
 
-  // 1. Вводной автомат
-  html += `<div class="din-mod din-main" title="Вводной автомат ${is3ph?'4P':'2P'} C${mainA}А">
+  // Helpers for module HTML
+  const modMain = () => `<div class="din-mod din-main" title="Вводной автомат ${is3ph?'4P':'2P'} C${mainA}А">
     <div class="mod-type">Ввод ${is3ph?'4P':'2P'}</div>
     <div class="mod-val">C${mainA}А</div>
     <div class="mod-type">Авт.</div>
   </div>`;
 
-  // 2. Противопожарное УЗО 100мА - только если включено в настройках (опция)
-  if (cfg.fireUzo) {
+  const modFireUzo = () => {
     const uzoA = uzoRating(mainA);
-    html += `<div class="din-mod din-uzo" title="Противопожарное УЗО ${uzoA}А/100мА (требует реле напряжения + УЗИП)">
+    return `<div class="din-mod din-uzo" title="Противопожарное УЗО ${uzoA}А/100мА">
       <div class="mod-type">УЗО пожар.</div>
       <div class="mod-val">${uzoA}А</div>
       <div class="mod-type">100мА</div>
     </div>`;
-  }
+  };
 
-  const dryGroups = groups.filter(g => !g.wet);
-  const wetGroups = groups.filter(g => g.wet);
+  const shortLabel = (label) => esc(label).length > 40 ? esc(label).slice(0, 39) + '…' : esc(label);
 
-  // 3. Сухие группы - обычные автоматы
-  for (const g of dryGroups) html += dryMod(g);
+  const modDry = (g, draggable) => {
+    const cls = g.breaker <= 16 ? 'din-brk-g' : g.breaker <= 32 ? 'din-brk-a' : 'din-brk-r';
+    const drag = draggable ? `draggable="true" data-num="${g.num}" class="din-mod ${cls} draggable"` : `class="din-mod ${cls}"`;
+    return `<div ${drag} title="Гр.${g.num}: ${esc(g.label)} - Авт. ${g.brkClass||'C'}${g.breaker}А">
+      <div class="mod-type">Авт. Гр.${g.num}</div>
+      <div class="mod-val">${g.brkClass||'C'}${g.breaker}А</div>
+      <div class="mod-room">${shortLabel(g.label)}</div>
+    </div>`;
+  };
 
-  // 4. Мокрые зоны - по выбранной схеме
+  const modDif = (g, draggable) => {
+    const mA = g.uzomA || 30;
+    const drag = draggable ? `draggable="true" data-num="${g.num}" class="din-mod din-dif draggable"` : `class="din-mod din-dif"`;
+    return `<div ${drag} title="Гр.${g.num}: ${esc(g.label)} - Диф ${g.brkClass||'C'}${g.breaker}А/${mA}мА">
+      <div class="mod-type">Диф ${mA}мА Гр.${g.num}</div>
+      <div class="mod-val">${g.brkClass||'C'}${g.breaker}А</div>
+      <div class="mod-room">${shortLabel(g.label)}</div>
+    </div>`;
+  };
+
+  // Build ordered group list from panelOrder
+  const orderedGroups = panelOrder.length
+    ? panelOrder.map(n => groups.find(g => g.num === n)).filter(Boolean)
+    : groups;
+
+  let html = modMain();
+  if (cfg.fireUzo) html += modFireUzo();
+
   if (scheme === 'B') {
-    // Схема Б: одно УЗО на зону + обычные автоматы за ним
-    const zones = buildWetZones(wetGroups);
+    const dryG  = orderedGroups.filter(g => !g.wet);
+    const wetG  = orderedGroups.filter(g => g.wet);
+    for (const g of dryG) html += modDry(g, true);
+    const zones = buildWetZones(wetG);
     for (const z of zones) {
-      html += `<div class="din-mod din-uzow" title="${esc(z.room)} - УЗО ${z.uzoRating}А/${z.uzomA}мА (расч. ток ${z.sumA.toFixed(1)} А)">
+      html += `<div class="din-mod din-uzow" title="${esc(z.room)} - УЗО ${z.uzoRating}А/${z.uzomA}мА">
         <div class="mod-type">УЗО ${z.uzomA}мА</div>
         <div class="mod-val">${z.uzoRating}А</div>
-        <div class="mod-type">${esc(z.room).slice(0,8)}</div>
+        <div class="mod-room">${esc(z.room)}</div>
       </div>`;
       for (const g of z.groups) {
         const cls = g.breaker <= 16 ? 'din-brk-g' : g.breaker <= 32 ? 'din-brk-a' : 'din-brk-r';
-        html += `<div class="din-mod ${cls}" title="Гр.${g.num}: ${esc(g.label)} - Авт. ${g.brkClass||'C'}${g.breaker}А (за УЗО ${z.uzomA}мА)">
-          <div class="mod-type">Авт.</div>
+        html += `<div draggable="true" data-num="${g.num}" class="din-mod ${cls} draggable" title="Гр.${g.num}: ${esc(g.label)} - Авт. ${g.brkClass||'C'}${g.breaker}А">
+          <div class="mod-type">Авт. Гр.${g.num}</div>
           <div class="mod-val">${g.brkClass||'C'}${g.breaker}А</div>
-          <div class="mod-type">Гр.${g.num}</div>
+          <div class="mod-room">${shortLabel(g.label)}</div>
         </div>`;
       }
     }
   } else {
-    // Схема А: дифавтомат на каждую мокрую линию
-    for (const g of wetGroups) {
-      const mA = g.uzomA || 30;
-      html += `<div class="din-mod din-dif" title="Гр.${g.num}: ${esc(g.label)} - Диф ${g.brkClass||'C'}${g.breaker}А/${mA}мА">
-        <div class="mod-type">Диф ${mA}мА</div>
-        <div class="mod-val">${g.brkClass||'C'}${g.breaker}А</div>
-        <div class="mod-type">Гр.${g.num}</div>
-      </div>`;
+    for (const g of orderedGroups) {
+      html += g.wet ? modDif(g, true) : modDry(g, true);
     }
   }
 
   rail.innerHTML = html;
+
+  // ── Drag & Drop ──────────────────────────────────────────────────────────────
+  let dragNum = null;
+
+  rail.querySelectorAll('.draggable').forEach(el => {
+    el.addEventListener('dragstart', e => {
+      dragNum = parseInt(el.dataset.num);
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(dragNum)); // обязательно для Firefox и некоторых сборок Chrome
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging');
+      rail.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over'));
+    });
+    el.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      rail.querySelectorAll('.drag-over').forEach(x => x.classList.remove('drag-over'));
+      el.classList.add('drag-over');
+    });
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      const toNum = parseInt(el.dataset.num);
+      const fromNum = dragNum || parseInt(e.dataTransfer.getData('text/plain'));
+      if (fromNum && fromNum !== toNum) {
+        const fromIdx = panelOrder.indexOf(fromNum);
+        const toIdx   = panelOrder.indexOf(toNum);
+        if (fromIdx >= 0 && toIdx >= 0) {
+          panelOrder.splice(fromIdx, 1);
+          panelOrder.splice(toIdx, 0, fromNum);
+          saveProject();
+          renderPanel();
+        }
+      }
+      dragNum = null;
+    });
+  });
 }
 
 // ─── RENDER COST ─────────────────────────────────────────────────────────────
