@@ -1,0 +1,11 @@
+<?php
+/**
+ * Database configuration for ElectroKit
+ *
+ * ВАЖНО: Измените эти значения на свои!
+ */
+
+define('DB_HOST', 'localhost');           // Обычно localhost для Synology
+define('DB_NAME', 'electrokit');          // Название базы данных
+define('DB_USER', 'electrokit_user');     // Имя пользователя БД
+define('DB_PASS', 'your_secure_password'); // Пароль БД
