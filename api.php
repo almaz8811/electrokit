@@ -1,7 +1,7 @@
 <?php
 /**
- * ElectroKit API - Server-side storage for settings and projects
- * Saves data to JSON files on Synology server
+ * ElectroKit API - MariaDB storage for settings and projects
+ * Saves data to MariaDB database on Synology server
  */
 
 header('Content-Type: application/json; charset=utf-8');
@@ -9,24 +9,90 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST');
 header('Access-Control-Allow-Headers: Content-Type');
 
-// Data directory - will be created if doesn't exist
-$dataDir = __DIR__ . '/data';
-$settingsFile = $dataDir . '/settings.json';
-$projectsFile = $dataDir . '/projects.json';
+// ─── DATABASE CONFIG ─────────────────────────────────────────────────────────
 
-// Create data directory if it doesn't exist
-if (!file_exists($dataDir)) {
-    if (!mkdir($dataDir, 0755, true)) {
-        respondError('Failed to create data directory');
-    }
+// ВАЖНО: Создайте файл db_config.php с вашими настройками:
+// <?php
+// define('DB_HOST', 'localhost');
+// define('DB_NAME', 'electrokit');
+// define('DB_USER', 'electrokit_user');
+// define('DB_PASS', 'your_password');
+
+if (file_exists(__DIR__ . '/db_config.php')) {
+    require_once __DIR__ . '/db_config.php';
+} else {
+    // Дефолтные настройки - ИЗМЕНИТЕ ИХ!
+    define('DB_HOST', 'localhost');
+    define('DB_NAME', 'electrokit');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
 }
 
-// Get request method and action
+// ─── DATABASE CONNECTION ─────────────────────────────────────────────────────
+
+function getDB() {
+    static $pdo = null;
+
+    if ($pdo === null) {
+        try {
+            $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
+            $options = [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ];
+            $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+        } catch (PDOException $e) {
+            respondError('Database connection failed: ' . $e->getMessage());
+        }
+    }
+
+    return $pdo;
+}
+
+// ─── INITIALIZE DATABASE ─────────────────────────────────────────────────────
+
+function initDatabase() {
+    $pdo = getDB();
+
+    // Settings table
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS settings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            data JSON NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    // Projects table
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS projects (
+            id VARCHAR(64) PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            type VARCHAR(50) DEFAULT 'apartment',
+            data JSON NOT NULL,
+            saved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_name (name),
+            INDEX idx_type (type),
+            INDEX idx_saved (saved_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    respond(['success' => true, 'message' => 'Database initialized']);
+}
+
+// ─── ROUTE HANDLER ───────────────────────────────────────────────────────────
+
 $method = $_SERVER['REQUEST_METHOD'];
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
-// Handle requests
 switch ($action) {
+    case 'init':
+        initDatabase();
+        break;
+
     case 'getSettings':
         handleGetSettings();
         break;
@@ -58,25 +124,20 @@ switch ($action) {
 // ─── SETTINGS ────────────────────────────────────────────────────────────────
 
 function handleGetSettings() {
-    global $settingsFile;
+    $pdo = getDB();
 
-    if (!file_exists($settingsFile)) {
+    $stmt = $pdo->query("SELECT data FROM settings ORDER BY id DESC LIMIT 1");
+    $row = $stmt->fetch();
+
+    if (!$row) {
         respond(['settings' => null]);
     }
 
-    $data = file_get_contents($settingsFile);
-    $settings = json_decode($data, true);
-
-    if ($settings === null) {
-        respondError('Failed to parse settings');
-    }
-
+    $settings = json_decode($row['data'], true);
     respond(['settings' => $settings]);
 }
 
 function handleSaveSettings() {
-    global $settingsFile;
-
     $input = file_get_contents('php://input');
     $data = json_decode($input, true);
 
@@ -87,9 +148,14 @@ function handleSaveSettings() {
     $settings = $data['settings'];
     $settings['_updated'] = date('c');
 
-    if (file_put_contents($settingsFile, json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) === false) {
-        respondError('Failed to save settings');
-    }
+    $pdo = getDB();
+
+    // Delete old settings (keep only latest)
+    $pdo->exec("DELETE FROM settings");
+
+    // Insert new settings
+    $stmt = $pdo->prepare("INSERT INTO settings (data) VALUES (:data)");
+    $stmt->execute(['data' => json_encode($settings, JSON_UNESCAPED_UNICODE)]);
 
     respond(['success' => true, 'updated' => $settings['_updated']]);
 }
@@ -97,25 +163,28 @@ function handleSaveSettings() {
 // ─── PROJECTS ────────────────────────────────────────────────────────────────
 
 function handleGetProjects() {
-    global $projectsFile;
+    $pdo = getDB();
 
-    if (!file_exists($projectsFile)) {
-        respond(['projects' => []]);
-    }
+    $stmt = $pdo->query("
+        SELECT id, name, type, data, saved_at
+        FROM projects
+        ORDER BY saved_at DESC
+    ");
 
-    $data = file_get_contents($projectsFile);
-    $projects = json_decode($data, true);
-
-    if ($projects === null) {
-        respondError('Failed to parse projects');
+    $projects = [];
+    while ($row = $stmt->fetch()) {
+        $projectData = json_decode($row['data'], true);
+        $projectData['id'] = $row['id'];
+        $projectData['name'] = $row['name'];
+        $projectData['type'] = $row['type'];
+        $projectData['_saved'] = $row['saved_at'];
+        $projects[] = $projectData;
     }
 
     respond(['projects' => $projects]);
 }
 
 function handleSaveProject() {
-    global $projectsFile;
-
     $input = file_get_contents('php://input');
     $data = json_decode($input, true);
 
@@ -125,46 +194,50 @@ function handleSaveProject() {
 
     $project = $data['project'];
 
-    // Load existing projects
-    $projects = [];
-    if (file_exists($projectsFile)) {
-        $existing = file_get_contents($projectsFile);
-        $projects = json_decode($existing, true);
-        if ($projects === null) $projects = [];
-    }
-
     // Generate project ID if not exists
-    if (!isset($project['id'])) {
+    if (!isset($project['id']) || empty($project['id'])) {
         $project['id'] = uniqid('proj_', true);
     }
 
+    $id = $project['id'];
+    $name = isset($project['name']) ? $project['name'] : 'Без названия';
+    $type = isset($project['type']) ? $project['type'] : 'apartment';
+
+    $pdo = getDB();
+
+    // Check if project exists
+    $stmt = $pdo->prepare("SELECT id FROM projects WHERE id = :id");
+    $stmt->execute(['id' => $id]);
+    $exists = $stmt->fetch();
+
+    if ($exists) {
+        // Update existing
+        $stmt = $pdo->prepare("
+            UPDATE projects
+            SET name = :name, type = :type, data = :data, saved_at = NOW()
+            WHERE id = :id
+        ");
+    } else {
+        // Insert new
+        $stmt = $pdo->prepare("
+            INSERT INTO projects (id, name, type, data, saved_at, created_at)
+            VALUES (:id, :name, :type, :data, NOW(), NOW())
+        ");
+    }
+
+    $stmt->execute([
+        'id' => $id,
+        'name' => $name,
+        'type' => $type,
+        'data' => json_encode($project, JSON_UNESCAPED_UNICODE)
+    ]);
+
     $project['_saved'] = date('c');
-
-    // Update or add project
-    $found = false;
-    for ($i = 0; $i < count($projects); $i++) {
-        if ($projects[$i]['id'] === $project['id']) {
-            $projects[$i] = $project;
-            $found = true;
-            break;
-        }
-    }
-
-    if (!$found) {
-        $projects[] = $project;
-    }
-
-    // Save
-    if (file_put_contents($projectsFile, json_encode($projects, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) === false) {
-        respondError('Failed to save project');
-    }
 
     respond(['success' => true, 'project' => $project]);
 }
 
 function handleDeleteProject() {
-    global $projectsFile;
-
     $input = file_get_contents('php://input');
     $data = json_decode($input, true);
 
@@ -172,57 +245,34 @@ function handleDeleteProject() {
         respondError('No project ID provided');
     }
 
-    $id = $data['id'];
+    $pdo = getDB();
 
-    // Load existing projects
-    if (!file_exists($projectsFile)) {
-        respond(['success' => true]);
-    }
-
-    $existing = file_get_contents($projectsFile);
-    $projects = json_decode($existing, true);
-    if ($projects === null) $projects = [];
-
-    // Filter out deleted project
-    $projects = array_filter($projects, function($p) use ($id) {
-        return $p['id'] !== $id;
-    });
-
-    // Re-index array
-    $projects = array_values($projects);
-
-    // Save
-    if (file_put_contents($projectsFile, json_encode($projects, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) === false) {
-        respondError('Failed to delete project');
-    }
+    $stmt = $pdo->prepare("DELETE FROM projects WHERE id = :id");
+    $stmt->execute(['id' => $data['id']]);
 
     respond(['success' => true]);
 }
 
 function handleListProjects() {
-    global $projectsFile;
+    $pdo = getDB();
 
-    if (!file_exists($projectsFile)) {
-        respond(['projects' => []]);
-    }
+    $stmt = $pdo->query("
+        SELECT id, name, type, saved_at,
+               JSON_LENGTH(JSON_EXTRACT(data, '$.rooms')) as room_count
+        FROM projects
+        ORDER BY saved_at DESC
+    ");
 
-    $data = file_get_contents($projectsFile);
-    $projects = json_decode($data, true);
-
-    if ($projects === null) {
-        respond(['projects' => []]);
-    }
-
-    // Return only metadata for list
-    $list = array_map(function($p) {
-        return [
-            'id' => $p['id'],
-            'name' => isset($p['name']) ? $p['name'] : 'Без названия',
-            'type' => isset($p['type']) ? $p['type'] : 'apartment',
-            '_saved' => isset($p['_saved']) ? $p['_saved'] : null,
-            'roomCount' => isset($p['rooms']) ? count($p['rooms']) : 0
+    $list = [];
+    while ($row = $stmt->fetch()) {
+        $list[] = [
+            'id' => $row['id'],
+            'name' => $row['name'],
+            'type' => $row['type'],
+            '_saved' => $row['saved_at'],
+            'roomCount' => (int)$row['room_count']
         ];
-    }, $projects);
+    }
 
     respond(['projects' => $list]);
 }
